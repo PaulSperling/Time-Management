@@ -81,6 +81,9 @@ class Task:
         )
 
 
+DEFAULT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tasks.json")
+
+
 def is_overdue(task):
     if task.done:
         return False
@@ -468,7 +471,7 @@ class TaskPage(QWidget):
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(True)
@@ -487,14 +490,14 @@ class TaskPage(QWidget):
         inner.addWidget(self.table)
 
         # description strip
-        self.desc_label = QLabel()
-        self.desc_label.setWordWrap(True)
+        self.desc_label = QTextEdit()
+        self.desc_label.setReadOnly(True)
+        self.desc_label.setPlaceholderText("no description")
         self.desc_label.setStyleSheet(
             "background: #252538; color: #a6adc8; font-size: 11px; "
-            "padding: 8px 10px; border: 1px solid #313244; border-radius: 5px;"
+            "padding: 4px 6px; border: 1px solid #313244; border-radius: 5px;"
         )
-        self.desc_label.setFixedHeight(46)
-        self.desc_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self.desc_label.setFixedHeight(80)
         inner.addWidget(self.desc_label)
 
         # link strip
@@ -582,7 +585,7 @@ class TaskPage(QWidget):
         src = self.proxy.mapToSource(current)
         if src.isValid() and 0 <= src.row() < len(self.model.tasks):
             t = self.model.tasks[src.row()]
-            self.desc_label.setText(t.description or "<i>no description</i>")
+            self.desc_label.setPlainText(t.description)
             if t.link:
                 href = t.link if _is_url(t.link) else QUrl.fromLocalFile(t.link).toString()
                 self.link_label.setText(
@@ -601,6 +604,19 @@ class TaskPage(QWidget):
         except ValueError:
             return None, None
 
+    def _selected_all(self):
+        rows = {self.proxy.mapToSource(idx).row()
+                for idx in self.table.selectedIndexes()}
+        result = []
+        for r in sorted(rows):
+            if 0 <= r < len(self.model.tasks):
+                task = self.model.tasks[r]
+                try:
+                    result.append((self.tasks.index(task), task))
+                except ValueError:
+                    pass
+        return result
+
     def _on_cell_clicked(self, proxy_index):
         if proxy_index.column() != COL['Link']:
             return
@@ -616,29 +632,29 @@ class TaskPage(QWidget):
         idx = self.table.indexAt(pos)
         if not idx.isValid():
             return
-        self.table.setCurrentIndex(idx)
-        src = self.proxy.mapToSource(idx)
-        if src.row() >= len(self.model.tasks):
-            return
-        task = self.model.tasks[src.row()]
-        try:
-            task_idx = self.tasks.index(task)
-        except ValueError:
+        if not self.table.selectionModel().isSelected(idx):
+            self.table.clearSelection()
+            self.table.setCurrentIndex(idx)
+
+        selected = self._selected_all()
+        if not selected:
             return
 
         menu = QMenu(self)
         act_complete = menu.addAction("Mark Complete")
-        act_edit     = menu.addAction("Edit…")
+        act_edit = menu.addAction("Edit…") if len(selected) == 1 else None
         menu.addSeparator()
-        act_delete   = menu.addAction("Delete")
+        act_delete = menu.addAction("Delete")
 
         chosen = menu.exec_(self.table.viewport().mapToGlobal(pos))
 
         if chosen == act_complete:
-            self.tasks[task_idx].done = True
+            for _, task in selected:
+                task.done = True
             self._refresh()
             self.tasks_changed.emit()
-        elif chosen == act_edit:
+        elif act_edit and chosen == act_edit:
+            self.table.setCurrentIndex(idx)
             self._edit_task()
         elif chosen == act_delete:
             self._delete_task()
@@ -660,17 +676,24 @@ class TaskPage(QWidget):
             self._refresh(); self.tasks_changed.emit()
 
     def _delete_task(self):
-        i, task = self._selected()
-        if task is None: return
-        if QMessageBox.question(self, "Delete", f"Delete '{task.name}'?",
+        selected = self._selected_all()
+        if not selected: return
+        n = len(selected)
+        msg = f"Delete '{selected[0][1].name}'?" if n == 1 else f"Delete {n} tasks?"
+        if QMessageBox.question(self, "Delete", msg,
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
-            self.tasks.pop(i)
+            for _, task in selected:
+                try:
+                    self.tasks.remove(task)
+                except ValueError:
+                    pass
             self._refresh(); self.tasks_changed.emit()
 
     def _toggle_done(self):
-        i, task = self._selected()
-        if task is None: return
-        self.tasks[i].done = not self.tasks[i].done
+        selected = self._selected_all()
+        if not selected: return
+        for _, task in selected:
+            task.done = not task.done
         self._refresh(); self.tasks_changed.emit()
 
 
@@ -734,18 +757,21 @@ class OverviewPage(QWidget):
         top_lbl.setStyleSheet("color: #585b70; font-size: 9px; font-weight: bold; letter-spacing: 1px; padding-top: 4px;")
         inner.addWidget(top_lbl)
 
-        self.urgent_table = QTableWidget(0, 7)
+        self.urgent_table = QTableWidget(0, 8)
         self.urgent_table.setHorizontalHeaderLabels(
-            ['Name', 'Project', 'Due', 'Pri', 'Urg', 'Time', 'Today'])
+            ['Name', 'Project', 'Due', 'Pri', 'Urg', 'Time', 'Today', 'Link'])
         hh = self.urgent_table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.Stretch)
-        for c in range(1, 7):
+        for c in range(1, 8):
             hh.setSectionResizeMode(c, QHeaderView.ResizeToContents)
         self.urgent_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.urgent_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.urgent_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.urgent_table.verticalHeader().setVisible(False)
         self.urgent_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.urgent_table.customContextMenuRequested.connect(self._on_context_menu)
+        self.urgent_table.doubleClicked.connect(self._on_urgent_double_click)
+        self.urgent_table.cellClicked.connect(self._on_urgent_cell_clicked)
         inner.addWidget(self.urgent_table)
 
         self._eod_btn = QPushButton("End of Day Summary")
@@ -818,6 +844,7 @@ class OverviewPage(QWidget):
                 (str(t.urgency_score),           Qt.AlignCenter),
                 (f"{t.time_estimate:.1f}h",      Qt.AlignCenter),
                 ("Yes" if t.do_today else "No",  Qt.AlignCenter),
+                ("↗" if t.link else "—",         Qt.AlignCenter),
             ]
             for col, (text, align) in enumerate(cells):
                 item = QTableWidgetItem(text)
@@ -833,6 +860,8 @@ class OverviewPage(QWidget):
                 if col == 6 and t.do_today:
                     item.setBackground(DO_TODAY_BG)
                     item.setForeground(QColor(255, 255, 255))
+                if col == 7:  # link
+                    item.setForeground(QColor(137, 180, 250) if t.link else TEXT_MUTED)
                 self.urgent_table.setItem(row, col, item)
 
     def _show_eod_summary(self):
@@ -848,25 +877,52 @@ class OverviewPage(QWidget):
         row = self.urgent_table.rowAt(pos.y())
         if row < 0 or row >= len(self._top10):
             return
-        task = self._top10[row]
-        self.urgent_table.selectRow(row)
+
+        selected_rows = sorted({idx.row() for idx in self.urgent_table.selectedIndexes()
+                                 if idx.row() < len(self._top10)})
+        if row not in selected_rows:
+            selected_rows = [row]
+        selected_tasks = [self._top10[r] for r in selected_rows]
 
         menu = QMenu(self)
         act_complete = menu.addAction("Mark Complete")
-        act_edit     = menu.addAction("Edit…")
+        act_edit = menu.addAction("Edit…") if len(selected_tasks) == 1 else None
         menu.addSeparator()
-        act_delete   = menu.addAction("Delete")
+        act_delete = menu.addAction("Delete")
 
         chosen = menu.exec_(self.urgent_table.viewport().mapToGlobal(pos))
 
         if chosen == act_complete:
-            task.done = True
+            for t in selected_tasks:
+                t.done = True
             self.tasks_changed.emit()
             self.refresh()
-        elif chosen == act_edit:
-            self._edit_task(task)
+        elif act_edit and chosen == act_edit:
+            self._edit_task(selected_tasks[0])
         elif chosen == act_delete:
-            self._delete_task(task)
+            n = len(selected_tasks)
+            msg = f"Delete '{selected_tasks[0].name}'?" if n == 1 else f"Delete {n} tasks?"
+            if QMessageBox.question(self, "Delete", msg,
+                                    QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+                for t in selected_tasks:
+                    try:
+                        self.tasks.remove(t)
+                    except ValueError:
+                        pass
+                self.tasks_changed.emit()
+                self.refresh()
+
+    def _on_urgent_double_click(self, index):
+        row = index.row()
+        if row < len(self._top10):
+            self._edit_task(self._top10[row])
+
+    def _on_urgent_cell_clicked(self, row, col):
+        if col != 7 or row >= len(self._top10):
+            return
+        task = self._top10[row]
+        if task.link:
+            _open_link(task.link)
 
     def _edit_task(self, task):
         try:
@@ -1008,7 +1064,7 @@ class WorkloadBarChartWidget(QWidget):
         w, h = self.width(), self.height()
         MAX_PCT = 150.0
 
-        margin_left  = 30
+        margin_left  = 40
         margin_right = 6
         margin_top   = 6
         margin_bottom = 28
@@ -1703,6 +1759,8 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._build()
         self._update_title()
+        if os.path.exists(DEFAULT_FILE):
+            self._load_file(DEFAULT_FILE)
 
     def _build(self):
         self.setMinimumSize(1280, 740)
@@ -1795,10 +1853,12 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(
             self, "Open Task Database", "", "JSON Files (*.json);;All Files (*)")
         if not path: return
+        self._load_file(path)
+
+    def _load_file(self, path):
         try:
             with open(path, 'r', encoding='utf-8') as fh:
                 raw = json.load(fh)
-            # backward compat: old format was a plain list of tasks
             if isinstance(raw, list):
                 task_data, project_data = raw, []
             else:
@@ -1816,8 +1876,12 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Open failed", str(e))
 
     def _save(self):
-        if self.current_file: self._write(self.current_file)
-        else: self._save_as()
+        if self.current_file:
+            self._write(self.current_file)
+        else:
+            self._write(DEFAULT_FILE)
+            self.current_file = DEFAULT_FILE
+            self._update_title()
 
     def _save_as(self):
         path, _ = QFileDialog.getSaveFileName(
