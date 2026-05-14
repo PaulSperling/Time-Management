@@ -1,0 +1,16 @@
+<svg width="680" height="680" viewBox="0 0 680 680" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>To-do app logo v3</title>
+  <desc>Clean geometric logo with three sharp polygons on a deep purple background</desc>
+
+  <rect width="680" height="680" fill="#2a1f6e"/>
+
+  <!-- Large back shard -->
+  <polygon points="100,520 200,80 580,200 540,600" fill="#3d2fa0"/>
+
+  <!-- Mid shard -->
+  <polygon points="260,600 160,260 560,120 620,480" fill="#6248d8"/>
+
+  <!-- Small bright top chip -->
+  <polygon points="340,80 580,160 500,340" fill="#a07fff"/>
+
+</svg>

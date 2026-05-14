@@ -1,0 +1,26 @@
+This document will establish the requirements for a to do list app. 
+
+There will be 3 pages:
+    The task page. This will be where the user inputs new tasks, and will be where the user goes when they need an overview of all tasks in the queue. It will follow a table structure, and should be information-packed and color-coded for quick at-a-glance information intake
+        Each task will have the following fields:
+            Name (short name of the task)
+            Description (longer description of the task and how to complete it)
+            Due date (date by which it should be complete)
+            Do date (The date when the user plans on doing it)
+            Priority (scale of 1-5. A 5 means that is is extremely important that it be done by the due date, and a 1 means that the due date is more flexible)
+            Time estimate (estimated amount of time the task will take)
+            Done (is the task done?)
+            Do today (if the do date is today, then this boolean should be true)
+            Urgency score (this is a combination of the priority and the proximity to the due date - higher priority and closer to the due date should increase this score. It will be used to sort tasks)
+        There should be a way of adding, deleting, and modifying tasks.
+    One will be the high-level overview. It should display the most urgent tasks, as well as daily time allocation
+        Only the most urgent 10 tasks will be displayed here. The rest will be on another page
+        Daily time allocation should include a few things:
+            Time left in the day. It should end at 5:00 pm on the current day, so for example if it's 2:00 pm, there are 3 hours left in the day
+            Time allocated to today's tasks. If a task is a "do today" task, then its estimated time should be included in the time allocated to today's tasks. If a task is complete, then it should no longer be a part of this sum
+            Time usage percent. This should be the percent of time left in the day that's allocated to tasks that should be completed today
+    There will be a calendar page, which will display the tasks on a calendar. 
+
+The task database should be saveable as a file, and you should be able to open another task database. 
+
+The software should be written in python/pyqt. 

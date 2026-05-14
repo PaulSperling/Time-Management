@@ -1,0 +1,29 @@
+{
+  "tasks": [
+    {
+      "name": "More detailed testing of the to do list app",
+      "description": "Something else",
+      "due_date": "2026-05-04",
+      "do_date": "2026-05-02",
+      "priority": 3,
+      "time_estimate": 1.0,
+      "done": false,
+      "project": "Little Vibe Code Projects"
+    },
+    {
+      "name": "Op3 on all the valve main bodies",
+      "description": "Need to run op 3. If I can't fix the rigid tapping issue in ~1.5 hrs, then I should just run the rest of them without it and hand tap",
+      "due_date": "2026-05-04",
+      "do_date": "2026-05-03",
+      "priority": 3,
+      "time_estimate": 2.0,
+      "done": false,
+      "project": "Poppet Valve"
+    }
+  ],
+  "projects": [
+    "Little Vibe Code Projects",
+    "Something else",
+    "Poppet Valve"
+  ]
+}
